@@ -2,9 +2,9 @@ import xml.etree.ElementTree as ET
 
 from qrsvgpy.utils import (
     DIRECTIONS,
-    replace_corner_,
-    replace_end_,
-    replace_circle_,
+    replace_corner,
+    replace_end,
+    rect_to_circle,
     registration_mark_,
 )
 
@@ -73,11 +73,16 @@ def prettify_qr_svg_(root, qr_code, side=16):
                 adjacency[k] = True
         return adjacency
 
-    registration_mark_(root, 7 * radius, 7 * radius)
-    registration_mark_(root, 51 * radius, 7 * radius)
-    registration_mark_(root, 7 * radius, 51 * radius)
+    center_reg = 7
+    offset = 2 * height - center_reg
+    registration_mark_(root, center_reg * radius, center_reg * radius)
+    registration_mark_(root, offset * radius, center_reg * radius)
+    registration_mark_(root, center_reg * radius, offset * radius)
 
     xy = [(y, x) for y in range(height) for x in range(width)]
+
+    lone_circle_group = ET.Element("{http://www.w3.org/2000/svg}g")
+
     for y, x in xy:
         rect = qr_code[y][x]
         if rect is None:
@@ -85,22 +90,32 @@ def prettify_qr_svg_(root, qr_code, side=16):
 
         adjacency_ = adjacency(y, x)
         num_adjacent = sum(adjacency_)
-        if not num_adjacent:
-            replace_circle_(root, rect)
-            continue
-        # Check if the pixel is adjacent to only one other pixel
+        match num_adjacent:
+            case 0:
+                circle = rect_to_circle(rect)
+                lone_circle_group.append(circle)
+                root.remove(rect)
 
-        if num_adjacent == 1:
-            # Get the direction of the adjacent pixelz
-            adjacent_dir_index = adjacency_.index(True)
-            replace_end_(root, rect, adjacent_dir_index)
+            case 1:
+                # Get the direction of the adjacent pixelz
+                adjacent_dir_index = adjacency_.index(True)
+                new_rect, circle = replace_end(rect, adjacent_dir_index)
+                root.append(circle)
+                root.append(new_rect)
+                root.remove(rect)
 
-            continue
+            case 2:
+                dirs = [k for k, v in enumerate(adjacency_) if v]
+                result = replace_corner(rect, dirs[0], dirs[1])
 
-        if num_adjacent == 2:
-            dirs = [k for k, v in enumerate(adjacency_) if v]
-            replace_corner_(root, rect, dirs[0], dirs[1])
-            continue
+                if result is None:
+                    continue
+                polygon, circle = result
+                root.append(circle)
+                root.append(polygon)
+                root.remove(rect)
+
+    root.append(lone_circle_group)
 
 
 def read_qr_svg(svg_path):

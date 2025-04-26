@@ -15,7 +15,7 @@ side = 16
 radius = side // 2
 
 
-def replace_circle_(root: ET.Element, rect: ET.Element):
+def rect_to_circle(rect: ET.Element):
     # Get the original rectangle's position
     rect_x = float(rect.get("x", 0))
     rect_y = float(rect.get("y", 0))
@@ -31,11 +31,10 @@ def replace_circle_(root: ET.Element, rect: ET.Element):
     for attr, value in rect.attrib.items():
         circle.set(attr, value)
 
-    root.remove(rect)
-    root.append(circle)
+    return circle
 
 
-def replace_end_(root: ET.Element, rect: ET.Element, dir_index: int):
+def replace_end(rect: ET.Element, dir_index: int):
     # Create a half circle that intersects with the rectangle
     rect_x = float(rect.get("x", 0))
     rect_y = float(rect.get("y", 0))
@@ -48,45 +47,38 @@ def replace_end_(root: ET.Element, rect: ET.Element, dir_index: int):
 
     # Create a rectangle element that covers half of the original rectangle
     # oriented toward the adjacent pixel (dx, dy)
-    rectangle = ET.Element("{http://www.w3.org/2000/svg}rect")
-    rectangle.set("width", str(side))
-    rectangle.set("height", str(side))
-    rectangle.set("style", "fill:black")
-    rectangle.set("x", str(rect_x))
-    rectangle.set("y", str(rect_y))
+    new_rect = ET.Element("{http://www.w3.org/2000/svg}rect")
+    new_rect.set("width", str(side))
+    new_rect.set("height", str(side))
+    new_rect.set("style", "fill:black")
+    new_rect.set("x", str(rect_x))
+    new_rect.set("y", str(rect_y))
 
     vertical = dir_index == Direction.RIGHT or dir_index == Direction.LEFT
 
     if vertical:
-        rectangle.set("width", str(radius))
+        new_rect.set("width", str(radius))
         if dir_index == Direction.RIGHT:
-            rectangle.set("x", str(rect_x + radius))
+            new_rect.set("x", str(rect_x + radius))
         else:
-            rectangle.set("x", str(rect_x))
+            new_rect.set("x", str(rect_x))
     else:
-        rectangle.set("height", str(radius))
+        new_rect.set("height", str(radius))
         if dir_index == Direction.DOWN:
-            rectangle.set("y", str(rect_y + radius))
+            new_rect.set("y", str(rect_y + radius))
         else:
-            rectangle.set("y", str(rect_y))
+            new_rect.set("y", str(rect_y))
 
     # Copy any other attributes from original rectangle
     for attr, value in rect.attrib.items():
         if attr not in ["x", "y", "width", "height", "style"]:
             circle.set(attr, value)
-            rectangle.set(attr, value)
+            new_rect.set(attr, value)
 
-    # Add both shapes to the group
-    root.append(rectangle)
-    root.append(circle)
-
-    # Remove the original rectangle and add the group
-    root.remove(rect)
+    return new_rect, circle
 
 
-def replace_corner_(
-    root: ET.Element, rect: ET.Element, dir_index_1: int, dir_index_2: int
-):
+def replace_corner(rect: ET.Element, dir_index_1: int, dir_index_2: int):
     # find the corner with no adjacent pixels
     # create a circle at the corner
     # replace rect with a triangle cut out from this corner, side=8,8
@@ -185,9 +177,7 @@ def replace_corner_(
             circle.set(attr, value)
             polygon.set(attr, value)
 
-    root.append(polygon)
-    root.append(circle)
-    root.remove(rect)
+    return polygon, circle
 
 
 def registration_mark_(
